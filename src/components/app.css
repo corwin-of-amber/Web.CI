@@ -1,0 +1,20 @@
+
+#app[data-v-filename] {
+    display: flex;
+}
+#app > ul[data-v-filename] {
+    width: 7em;
+    list-style: none;
+    padding-inline-start: 0;
+}
+#app > ul > li[data-v-filename] {
+    padding-left: .3em;
+}
+#app > ul > li.selected[data-v-filename] {
+    background: blue;
+    color: white;
+}
+#app > div#area[data-v-filename] {
+    background: #ddd;
+    flex-grow: 1;
+}
