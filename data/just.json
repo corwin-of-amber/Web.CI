@@ -3,6 +3,9 @@
         "build": [
             "echo building *",
             "make"
+        ],
+        "test": [
+            
         ]
     }
 }

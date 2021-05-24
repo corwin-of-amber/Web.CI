@@ -20,6 +20,12 @@ app.get('/', (req, res) => {
   res.send('Hello World!')
 })*/
 
+app.get('/actions', (req, res) => {
+    var scripts = new Scripts('data/just.json');
+
+    res.send(JSON.stringify(scripts.names));
+});
+
 app.ws('/', function(ws, req) {
     ws.on('message', async function(msg) {
         console.log(msg);

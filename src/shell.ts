@@ -80,6 +80,10 @@ class Scripts {
         this.defs = JSON.parse(fs.readFileSync(fn, 'utf-8'));
     }
 
+    get names() {
+        return Object.keys(this.defs.scripts);
+    }
+
     get(name: string) {
         return this.defs.scripts[name] || [name];
     }

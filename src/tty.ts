@@ -5,50 +5,73 @@ import './tty.css';
 
 // @ts-ignore
 import appComponent from './components/app.vue';
+import { App } from './components/app';
 
-
-document.addEventListener('DOMContentLoaded', main);
 
 function main() {
     if (!process.version)
         Object.assign(process, require('process'));
 
     var app = Vue.createApp(appComponent, {
-                  actions: Vue.reactive(['a', 'b'])
+                  actions: Vue.reactive([])
               })
-              .mount('#app-container');
+              .mount('#app-container') as Vue.ComponentPublicInstance & App;
 
     var terminal = new Terminal({columns: 80});
-    terminal.dom(document.querySelector('#app .area--terminal'));
 
-    //remoteShell(terminal);
-    nativeShell(terminal);
-
-    // @ts-ignore
-    app.selectAction('a');
+    remoteShell(terminal, app);
+    //nativeShell(terminal, app);
 
     Object.assign(window, {terminal, app});
 }
 
-function remoteShell(terminal: Terminal) {
-    var w = new WebSocket(`ws://${location.host || 'localhost:3300'}`);
+async function remoteShell(terminal: Terminal, app: App) {
+    var host = location.host || 'localhost:3300',
+        actions = await (await fetch(`http://${host}/actions`)).json();
 
-    w.addEventListener('message', ev => {
-        console.log(ev);
-        terminal.write(ev.data);
+    app.actions.push(...actions);
+
+    await Promise.resolve(); // now app has to update...
+
+    var w = new WebSocket(`ws://${host}`);
+
+    w.addEventListener('open', () => {
+        w.addEventListener('message', ev => terminal.write(ev.data));
+        var action = actions[0];
+        if (action) {
+            app.selectAction(action);
+            terminal.dom(app.getTerminal(action));
+            w.send(action);
+        }
     });
-    w.addEventListener('open', () => w.send('build'));
 
     Object.assign(window, {w});
 }
 
 
-async function nativeShell(terminal: Terminal) {
+async function nativeShell(terminal: Terminal, app: App) {
     const { Shell, Scripts } = await import('./shell');
 
     var shell = new Shell();
     shell.pipe(terminal as WritableStreamDefaultWriter);
-    shell.runScript(['ls', 'npm ls']);
 
-    Object.assign(window, {shell});
+    var scripts = new Scripts('data/just.json');
+    app.actions.push(...scripts.names);
+
+    await Promise.resolve(); // now app has to update...
+
+    var action = scripts.names[0];
+    if (action) {
+        app.selectAction(action);
+        terminal.dom(app.getTerminal(action));
+        shell.runScript(scripts.get(action))
+        .catch(() => app.status.set(action, '✗'))
+    }
+
+    Object.assign(window, {shell, scripts});
+
+    return {shell, scripts};
 }
+
+
+document.addEventListener('DOMContentLoaded', main);
