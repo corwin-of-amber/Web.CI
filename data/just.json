@@ -1,11 +1,14 @@
 {
     "scripts": {
-        "build": [
-            "echo building *",
-            "make"
+        "download": [
+            "git clone -b wip/phased-build https://github.com/corwin-of-amber/node-webrtc.git ."
         ],
-        "test": [
-            
+        "build": [
+            "npm i ./force-py2-0.1.1.tgz",
+            "npm i",
+            "cd phase-1",
+            "npm run build",
+            "# kremlin index.html"
         ]
     }
 }

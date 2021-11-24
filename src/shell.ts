@@ -1,5 +1,8 @@
 import fs from 'fs';
+import path from 'path';
+import assert from 'assert';
 import EventEmitter from 'events';
+import pty from 'node-pty'; /* @kremlin.native */
 import shellQuote from 'shell-quote';
 
 
@@ -20,9 +23,13 @@ class Shell extends EventEmitter {
     }
 
     async run(cmd: string) {
-        var [file, ...args] = this.parse(cmd);
+        var [file, ...args] = [].concat(...this.parse(cmd)
+            .map(arg => this.expand(arg)));
         try {
-            return this.report(await this.spawn(file, args));
+            var bic = this.builtinCmds[file];
+            if (bic) return bic(args);
+            else
+                return this.report(await this.spawn(file, args));
         }
         catch (e) { throw this.report(e); }
     }
@@ -33,8 +40,14 @@ class Shell extends EventEmitter {
         }
     }
 
-    parse(cmd: string): string[] {
+    parse(cmd: string): Arg[] {
         return shellQuote.parse(cmd);
+    }
+
+    expand(arg: Arg): string[] {
+        if (typeof arg === 'string') return [arg];
+        else if (arg.pattern) return [arg.pattern]; /** @todo */
+        else assert(false);
     }
 
     report(e: CommandExit) {
@@ -56,8 +69,6 @@ class Shell extends EventEmitter {
     }
 
     spawn(file: string, args: string[] = [], options: {} = {}): Promise<CommandExit> {
-        const pty = (0||require)('node-pty') as typeof import('node-pty');
-
         var p = pty.spawn(file, args, {
             cwd: this.cwd,
             env: this.env,
@@ -68,8 +79,17 @@ class Shell extends EventEmitter {
         return new Promise((resolve, reject) =>
             p.onExit(e => e.signal || e.exitCode ? reject(e) : resolve(e)));
     }
+
+    builtinCmds = {
+        cd: (args: string[]) => {
+            if (args.length != 1)
+                throw new Error('cd: wrong number of arguments');
+            this.cwd = path.resolve(this.cwd, args[0])
+        }
+    }
 }
 
+type Arg = string | {pattern: string}
 type CommandExit = {exitCode: number, signal?: number}
 
 

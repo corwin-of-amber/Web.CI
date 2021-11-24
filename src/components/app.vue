@@ -12,7 +12,7 @@
         </ul>
         <div id="area">
             <div v-for="action in actions" :key="action"
-                :ref="registerTab" :data-action="action"
+                :ref="(el) => registerTab(el, action)" :data-action="action"
                 class="area--tab" :class="{active: action == selected}">
                 <div class="area--terminal" v-once/>
             </div>
@@ -26,6 +26,7 @@
 }
 ul {
     width: 7em;
+    line-height: 1.3;
     list-style: none;
     padding-inline-start: 0;
 }
@@ -57,10 +58,13 @@ export default {
     data: () => ({selected: undefined, status: new Map}),
     methods: {
         selectAction(action: string, ev: MouseEvent) {
-            this.selected = action;
+            if (this.selected != action) { // avoid event cycles
+                this.selected = action;
+                this.$emit('select', {action});
+            }
         },
-        registerTab(el: Element) {
-            this.tabs.set(el.getAttribute('data-action'), el)
+        registerTab(el: Element, action: string) {
+            this.tabs.set(action, el)
         },
         getTab(action: string) {
             return this.tabs.get(action);
