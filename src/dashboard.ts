@@ -1,4 +1,3 @@
-import fs from 'fs';
 import assert from 'assert';
 
 import Vue from 'vue';
@@ -10,7 +9,8 @@ import './tty.css';
 // @ts-ignore
 import appComponent from './components/app.vue';
 import { App } from './components/app';
-import { Shell, Scripts } from './shell';
+import { Shell } from './shell';
+import { Batch, Scripts, BuildDirectory } from './batch';
 
 import { ViviMap } from './infra/collections';
 
@@ -18,9 +18,8 @@ import { ViviMap } from './infra/collections';
 class DashboardApp {
     view: App
     tabs = new ViviMap<string, Tab>().withFactory(k => this._createTabFor(k))
-    scripts: Scripts
 
-    buildDir: BuildDirectory
+    batch = new Batch
 
     constructor(containerId = '#app-container') {
         this.view = Vue.createApp(appComponent, {
@@ -29,24 +28,20 @@ class DashboardApp {
             })
             .mount(containerId) as Vue.ComponentPublicInstance & App;
 
-        this.buildDir = new BuildDirectory('/tmp/mannequin');
-    }
-
-    loadScripts(scripts: Scripts) {
-        assert(!this.scripts);
-        this.scripts = scripts;
-        this.view.actions.push(...scripts.names);
+        this.batch.on('scripts:loaded', async () => {
+            this.view.actions.push(...this.batch.scripts.names);
+            await Promise.resolve(); // now app has to update...
+            var firstAction = this.batch.scripts.names[0];
+            firstAction && this.switchTo(firstAction, true);
+        });
+        this.batch.on('script:done', ({scriptName: action, status}) => {
+            this.view.status.set(action, status === 'ok' ? '✓' : '✗');
+        })
     }
 
     startLocal(action: string) {
-        var shell = this._createLocalShell(),
-            tab = this.attach(action, shell),
-            script = this.scripts?.get(action);
-        if (script) {
-            tab.controller.runScript(script)
-            .then(() => this.view.status.set(action, '✓'))
-            .catch(() => this.view.status.set(action, '✗'))    
-        }
+        var { shell } = this.batch.startLocalJob(action),
+            tab = this.attach(action, shell);
         return tab;
     }
 
@@ -83,37 +78,8 @@ class DashboardApp {
             }
         })};
     }
-
-    _createLocalShell() {
-        var shell = new Shell();
-        if (this.buildDir.state == BuildDirectory.State.UNINIT) {
-            //this.buildDir.clean();
-            this.buildDir.start();
-        }
-        shell.cwd = this.buildDir.dir;
-        return shell;
-    }
 }
 
-class BuildDirectory {
-    dir: string
-    state = BuildDirectory.State.UNINIT
-
-    constructor(dir: string) { this.dir = dir; }
-
-    clean() {
-        fs.rmSync(this.dir, {recursive: true, force: true});
-    }
-
-    start() {
-        fs.mkdirSync(this.dir, {recursive: true});
-        this.state = BuildDirectory.State.STARTED;
-    }
-}
-
-namespace BuildDirectory {
-    export enum State { UNINIT, STARTED };
-}
 
 type Tab = {controller?: Shell, terminal: Terminal}
 //type Terminal = any
@@ -156,13 +122,7 @@ async function remoteShell(terminal: Terminal, app: App) {
 */
 
 async function nativeShell(app: DashboardApp) {
-
-    app.loadScripts(new Scripts('data/just.json'));
-
-    await Promise.resolve(); // now app has to update...
-
-    var action = app.scripts.names[0];
-    if (action) app.switchTo(action, true);
+    app.batch.loadScripts(new Scripts('data/just.json'));
 }
 
 

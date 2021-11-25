@@ -4,6 +4,7 @@ import assert from 'assert';
 import EventEmitter from 'events';
 import pty from 'node-pty'; /* @kremlin.native */
 import shellQuote from 'shell-quote';
+import glob from 'glob';
 
 
 class Shell extends EventEmitter {
@@ -46,7 +47,7 @@ class Shell extends EventEmitter {
 
     expand(arg: Arg): string[] {
         if (typeof arg === 'string') return [arg];
-        else if (arg.pattern) return [arg.pattern]; /** @todo */
+        else if (arg.pattern) return glob.sync(arg.pattern); /** @todo */
         else assert(false);
     }
 
@@ -93,21 +94,4 @@ type Arg = string | {pattern: string}
 type CommandExit = {exitCode: number, signal?: number}
 
 
-class Scripts {
-    defs: {scripts: {[name: string]: string[]}}
-
-    constructor(fn: string) {
-        this.defs = JSON.parse(fs.readFileSync(fn, 'utf-8'));
-    }
-
-    get names() {
-        return Object.keys(this.defs.scripts);
-    }
-
-    get(name: string) {
-        return this.defs.scripts[name] || [name];
-    }
-}
-
-
-export { Shell, Scripts }
+export { Shell }

@@ -1,6 +1,7 @@
 {
     "scripts": {
         "download": [
+            "echo *",
             "git clone -b wip/phased-build https://github.com/corwin-of-amber/node-webrtc.git ."
         ],
         "build": [
