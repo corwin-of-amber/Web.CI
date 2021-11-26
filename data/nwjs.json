@@ -1,0 +1,41 @@
+{
+    "scripts": {
+        "options": [
+            "BRANCH=nw58",
+            [
+             "BUILD_ARGS=(",
+             "  is_debug=false",
+             "  is_component_ffmpeg=true",
+             "  target_cpu='\"arm64\"'",
+             "  symbol_level=1",
+             "  proprietary_codecs=true",
+             "  ffmpeg_branding='\"Chromium\"'",
+             "  enable_stripping=true",
+             "  enable_dsyms=true",
+             "  enable_precompiled_headers=false",
+             ")"
+            ],
+            [
+             "GYP_ARGS=(",
+             "  target_arch=arm64",
+             "  building_nw=1",
+             "  nwjs_sdk=1",
+             "  disable_nacl=0",
+             "  mac_breakpad=1",
+             "  buildtype=Official",
+             ")"
+            ]
+        ],
+        "depot": [
+            {
+                "_": "git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git",
+                "fail": "continue"
+            },
+            "PATH=\"$PATH:$PWD/depot_tools\""
+        ],
+        "configure": [
+            "echo $BUILD_ARGS",
+            "echo $PATH"
+        ]
+    }
+}

@@ -12,14 +12,17 @@ function main() {
     var opts = o.opts();
 
     var batch = new Batch;
-    console.log(opts.dir, o.args);
     if (opts.dir)
         batch.buildDir = new BuildDirectory(opts.dir);
 
     batch.loadScripts(o.args[0]);
     console.log(batch.scripts.defs);
 
-    batch.on('script:done', ({scriptName, status, err}) => {
+    batch.on('script:start', ({scriptName}) => {
+        console.log(`\n⦿ '${scriptName}' started`); 
+    });
+
+    batch.on('script:end', ({scriptName, status, err}) => {
         if (status === 'ok')
             console.log(`\n✓ '${scriptName}' completed`); 
         else {
