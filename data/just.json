@@ -4,12 +4,13 @@
             "echo *",
             "git clone -b wip/phased-build https://github.com/corwin-of-amber/node-webrtc.git ."
         ],
-        "build": [
-            "npm i ./force-py2-0.1.1.tgz",
-            "npm i",
+        "build:phase-1": [
+            "SKIP_DOWNLOAD=1 npm i",
             "cd phase-1",
-            "npm run build",
-            "# kremlin index.html"
+            "npm run build"
+        ],
+        "build": [
+            "npm run build"
         ]
     }
 }

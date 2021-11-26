@@ -24,13 +24,17 @@ class Shell extends EventEmitter {
     }
 
     async run(cmd: string) {
-        var [file, ...args] = [].concat(...this.parse(cmd)
-            .map(arg => this.expand(arg)));
+        var {args: [file, ...args], env} = this.interp(cmd);
+
+        if (!file) {
+            Object.assign(this.env, env);
+            return;
+        }
         try {
             var bic = this.builtinCmds[file];
             if (bic) return bic(args);
             else
-                return this.report(await this.spawn(file, args));
+                return this.report(await this.spawn(file, args, env));
         }
         catch (e) { throw this.report(e); }
     }
@@ -45,10 +49,28 @@ class Shell extends EventEmitter {
         return shellQuote.parse(cmd);
     }
 
+    interp(cmd: string): {args: string[], env: Env} {
+        return this.splitEnv(
+            [].concat(...this.parse(cmd)
+                      .map(arg => this.expand(arg)))
+        );
+    }
+
     expand(arg: Arg): string[] {
         if (typeof arg === 'string') return [arg];
         else if (arg.pattern) return glob.sync(arg.pattern); /** @todo */
-        else assert(false);
+        else if (arg.comment) return [];
+        else { console.warn('shell: unrecognized argument', arg); assert(false); }
+    }
+
+    splitEnv(args: string[]) {
+        var env: Env = {}, i = 0;
+        for (; i < args.length; i++) {
+            var mo = args[i].match(/^(\w+)=(.*)$/);
+            if (mo) env[mo[1]] = mo[2];
+            else break;
+        }
+        return { args: args.slice(i), env };
     }
 
     report(e: CommandExit) {
@@ -69,10 +91,10 @@ class Shell extends EventEmitter {
         return this;
     }
 
-    spawn(file: string, args: string[] = [], options: {} = {}): Promise<CommandExit> {
+    spawn(file: string, args: string[] = [], env: Env = {}, options: {} = {}): Promise<CommandExit> {
         var p = pty.spawn(file, args, {
             cwd: this.cwd,
-            env: this.env,
+            env: {...this.env, ...env},
             ...this.term, ...options
         });
 
@@ -90,8 +112,9 @@ class Shell extends EventEmitter {
     }
 }
 
-type Arg = string | {pattern: string}
-type CommandExit = {exitCode: number, signal?: number}
+type Arg = string | {pattern?: string, comment?: string};
+type Env = {[varname: string]: string};
+type CommandExit = {exitCode: number, signal?: number};
 
 
 export { Shell }
