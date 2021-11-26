@@ -30,13 +30,16 @@ class Batch extends EventEmitter {
             script = this.scripts?.get(scriptName);
 
         var job = (async () => {
+            var outcome: {scriptName: string, status: string, err?: any};
             try {
                 await shell.runScript(script);
-                this.emit('script:done', {scriptName, status: 'ok'});
+                outcome = {scriptName, status: 'ok'};
             }
             catch (err) {
-                this.emit('script:done', {scriptName, status: 'err', err});
+                outcome = {scriptName, status: 'err', err};
             }
+            this.emit('script:done', outcome);
+            return outcome;
         })();
 
         return {shell, job};
