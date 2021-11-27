@@ -29,20 +29,27 @@ class Batch extends EventEmitter {
 
     startLocalJob(scriptName: string) {
         var shell = this.createLocalShell(),
-            script = this.scripts?.get(scriptName);
+            script = this.scripts?.get(scriptName),
+            startTime = Date.now();
 
-        this.emit('script:start', {scriptName});
+        this.emit('script:start', {scriptName, startTime});
 
         var job = (async () => {
-            var outcome: {scriptName: string, status: string, err?: any};
+            await Promise.resolve(); // allow caller to set up event hooks
+
+            var outcome = {scriptName, status: '', err: undefined,
+                           startTime, endTime: -1, totalTime: 0};
             try {
                 await shell.runScript(script);
                 this.lastState = {env: shell.env, vars: shell.vars};
-                outcome = {scriptName, status: 'ok'};
+                outcome.status = 'ok';
             }
             catch (err) {
-                outcome = {scriptName, status: 'err', err};
+                outcome.status = 'err';
+                outcome.err = err;
             }
+            outcome.totalTime = (outcome.endTime = Date.now()) - startTime;
+
             this.emit('script:end', outcome);
             return outcome;
         })();

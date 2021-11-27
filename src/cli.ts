@@ -22,12 +22,15 @@ function main() {
         console.log(`\n⦿ '${scriptName}' started`); 
     });
 
-    batch.on('script:end', ({scriptName, status, err}) => {
+    batch.on('script:end', ({scriptName, status, err, totalTime}) => {
         if (status === 'ok')
             console.log(`\n✓ '${scriptName}' completed`); 
         else {
             if (err) console.error(err);
             console.log(`\n✗ '${scriptName}' failed`); 
+        }
+        if (totalTime > REPORT_TIME_IF_GT) {
+            console.log(`   (${formatDuration(totalTime)})`);
         }
     })
 
@@ -41,5 +44,13 @@ async function runActions(batch: Batch, actions: string[]) {
         await job;
     }
 }
+
+function formatDuration(millis: number) {
+    return `${Math.round(millis / 1000)} sec`;
+}
+
+
+const REPORT_TIME_IF_GT = 100 * 1000; /* ms */
+
 
 main();
