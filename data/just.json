@@ -1,11 +1,10 @@
 {
     "scripts": {
         "download": [
-            "echo *",
             "git clone -b wip/phased-build https://github.com/corwin-of-amber/node-webrtc.git ."
         ],
         "build:phase-1": [
-            "SKIP_DOWNLOAD=1 npm i",
+            "SKIP_BIN=1 npm i",
             "cd phase-1",
             "npm run build"
         ],

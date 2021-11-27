@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
 import EventEmitter from 'events';
+import child_process from 'child_process';
 import pty from 'node-pty'; /* @kremlin.native */
 import shellQuote from 'shell-quote';
 import glob from 'glob';
@@ -34,7 +35,7 @@ class Shell extends EventEmitter {
     async _run(cmd: CommandInput, opts: CommandOptions = {}) {
         this.env['PWD'] = this.cwd;
 
-        var {args: [file, ...args], env} = this.interp(cmd);
+        var {args: [file, ...args], env, stdin} = this.interp(cmd);
 
         if (!file) {
             /** @todo add distinction between shell vars and env vars (`export`) */
@@ -42,17 +43,22 @@ class Shell extends EventEmitter {
             Object.assign(this.env, env);
             return;
         }
+
+        this.reportStart(cmd);
         
         try {
             var bic = this.builtinCmds[file];
             if (bic) return bic(args);
             else
-                return this.report(await this.spawn(file, args, env));
+                return this.reportEnd(await this.spawn(file, args, env, stdin));
         }
         catch (e) {
-            this.report(e);
+            this.reportEnd(e);
             if (opts.fail != 'continue') throw e;  // 'stop' is the default
-            else this.emit('message', '(continuing anyway)');
+            else {
+                this.emit('message', '(continuing anyway)');
+                return e;
+            }
         }
     }
 
@@ -62,18 +68,38 @@ class Shell extends EventEmitter {
         }
     }
 
-    parse(cmd: CommandInput): Arg[] {
-        if (Array.isArray(cmd))
-            return [].concat(...cmd.map(ln => this.parse(ln)));
-        else
-            return shellQuote.parse(cmd, this.env);
+    /** handles `<<` input redirection */
+    preparse(cmd: CommandInput): PreparsedCommand {
+        if (Array.isArray(cmd)) {
+            for (let i = 0; i < cmd.length; i++) {
+                var redir = cmd[i].match(/^(.*)<<\s*$/);
+                if (redir) {
+                    return {
+                        cmd: [...cmd.slice(0, i), redir[1]],
+                        stdin: cmd.slice(i + 1).join('\n')
+                    };
+                }
+            }
+        }
+        return {cmd};
     }
 
-    interp(cmd: CommandInput): {args: string[], env: Env} {
-        return this.splitEnv(
-            [].concat(...this.parse(cmd)
-                      .map(arg => this.expand(arg)))
-        );
+    parse(cmd: CommandInput): ParsedCommand {
+        var pre = this.preparse(cmd);
+        return {args: this._parse(pre.cmd), stdin: pre.stdin};
+    }
+
+    _parse(cmd: CommandInput): Arg[] {
+        if (Array.isArray(cmd)) cmd = cmd.join(' '); // this is needed because quotes may span multiple lines
+        return shellQuote.parse(cmd, this.env);
+    }
+
+    interp(cmd: CommandInput): ExpandedCommand {
+        var par = this.parse(cmd),
+            {args, env} = this.splitEnv(
+                [].concat(...par.args.map(arg => this.expand(arg)))
+            );
+        return {args, env, stdin: par.stdin};
     }
 
     expand(arg: Arg): Arglet[] {
@@ -122,7 +148,12 @@ class Shell extends EventEmitter {
         return [i, val];
     }
 
-    report(e: CommandExit) {
+    reportStart(cmd: CommandInput) {
+        if (Array.isArray(cmd)) cmd = cmd.join('\n'); // sry
+        this.emit('message', cmd);
+    }
+
+    reportEnd(e: CommandExit) {
         if (e.signal) this.emit('message', `Signal ${e.signal}`);
         else if (e.exitCode) this.emit('message', `\nExit ${e.exitCode}.`);
         else this.emit('message', `\u2756`);  // ❖
@@ -140,7 +171,14 @@ class Shell extends EventEmitter {
         return this;
     }
 
-    spawn(file: string, args: string[] = [], env: Env = {}, options: {} = {}): Promise<CommandExit> {
+    spawn(file: string, args: string[] = [], env: Env = {},
+          stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
+        return stdin ? this.spawnChild(file, args, env, stdin, options)
+                     : this.spawnPty(file, args, env, stdin, options);
+    }
+
+    spawnPty(file: string, args: string[] = [], env: Env = {},
+             stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
         var p = pty.spawn(file, args, {
             cwd: this.cwd,
             env: {...this.env, ...env},
@@ -148,8 +186,30 @@ class Shell extends EventEmitter {
         });
 
         p.onData(d => this.emit('data', d));
+        if (typeof stdin === 'string') { p.write(stdin); p.write('\n\x04'/*EOF*/); }
         return new Promise((resolve, reject) =>
             p.onExit(e => e.signal || e.exitCode ? reject(e) : resolve(e)));
+    }
+
+    spawnChild(file: string, args: string[] = [], env: Env = {},
+               stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
+        var c = child_process.spawn(file, args, {
+            cwd: this.cwd,
+            env: {...this.env, ...env},
+            stdio: ['pipe', 'pipe', 'pipe'],
+            ...options
+        });
+
+        for (let s of [c.stdout, c.stderr])
+            s.on('data', d => this.emit('data', d));
+        if (stdin) c.stdin.write(stdin);
+        c.stdin.end();
+
+        return new Promise((resolve, reject) =>
+            c.on('exit', (exitCode, signal) => {
+                var e = {exitCode, signal};
+                e.signal || e.exitCode ? reject(e) : resolve(e)
+            }));
     }
 
     builtinCmds = {
@@ -167,7 +227,22 @@ type Env = {[varname: string]: string};
 type ScriptEntry = CommandInput | {_: CommandInput} & CommandOptions;
 type CommandInput = string | string[];
 type CommandOptions = {fail?: 'stop' | 'continue'};
-type CommandExit = {exitCode: number, signal?: number};
+type CommandExit = {exitCode: number, signal?: number | NodeJS.Signals};
 
+type PreparsedCommand = {
+    cmd: CommandInput
+    stdin?: string
+};
+
+type ParsedCommand = {
+    args: Arg[]
+    stdin?: string
+};
+
+type ExpandedCommand = {
+    args: string[]
+    env: Env
+    stdin?: string
+};
 
 export { Shell, Env }
