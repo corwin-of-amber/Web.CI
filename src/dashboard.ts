@@ -1,5 +1,3 @@
-import assert from 'assert';
-
 import Vue from 'vue';
 import { Terminal } from 'xterm';
 import 'xterm/css/xterm.css';
@@ -10,7 +8,7 @@ import './tty.css';
 import appComponent from './components/app.vue';
 import { App } from './components/app';
 import { Shell } from './shell';
-import { Batch, Scripts, BuildDirectory } from './batch';
+import { Batch, Scripts } from './batch';
 
 import { ViviMap } from './infra/collections';
 

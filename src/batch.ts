@@ -1,7 +1,7 @@
 import fs from 'fs';
 import assert from 'assert';
 import { EventEmitter } from 'events';
-import { Shell, Env } from './shell';
+import { Shell, Env, CommandExit } from './shell';
 
 
 class Batch extends EventEmitter {
@@ -58,7 +58,7 @@ class Batch extends EventEmitter {
     }
 
     createLocalShell() {
-        var shell = new Shell();
+        var shell = this.opts.dry ? new Batch.DryRunShell() : new Shell();
         if (this.buildDir.state == BuildDirectory.State.UNINIT) {
             if (this.opts.clean)
                 this.buildDir.clean();
@@ -76,6 +76,20 @@ class Batch extends EventEmitter {
 namespace Batch {
     export type Options = {
         clean?: boolean
+        dry?: boolean
+    }
+
+    /**
+     * Overrides `spawn` to just print the expanded command line.
+     */
+    export class DryRunShell extends Shell {
+        async spawn(file: string, args: string[] = [], env: Env = {},
+                    stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
+
+            this.emit('data', [file, ...args].join('\n    '));
+
+            return {exitCode: 0, signal: undefined};
+        }
     }
 }
 

@@ -7,11 +7,13 @@ function main() {
     var o = commander.program
         .arguments('<file> [actions...]')
         .option('--dir <dir>')
+        .option('-c,--clean', 'clean directory before running actions')
+        .option('-n,--dry-run', 'do not actually run commands; just print them')
         .parse(process.argv);
 
     var opts = o.opts();
 
-    var batch = new Batch;
+    var batch = new Batch({clean: opts.clean, dry: opts.dryRun});
     if (opts.dir)
         batch.buildDir = new BuildDirectory(opts.dir);
 
