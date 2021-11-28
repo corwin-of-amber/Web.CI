@@ -1,6 +1,6 @@
 import commander from 'commander';
 
-import { Batch, BuildDirectory } from './batch';
+import { Batch, BuildDirectory, Scripts } from './batch';
 
 
 function main() {
@@ -34,14 +34,37 @@ function main() {
         }
     })
 
-    runActions(batch, o.args.slice(1));
+    runActions(batch, parseActions(batch.scripts, o.args.slice(1)));
+}
+
+function parseActions(scripts: Scripts, spec: string[]) {
+    if (spec.length === 0) return scripts.names;
+    else return [].concat(...spec.map(nm => {
+        var dots = nm.split(/\.\.+/);
+        if (dots.length == 1) return [nm];
+        else if (dots.length == 2) {
+            function find(name: string) {
+                var idx = names.indexOf(name);
+                if (idx < 0) throw new Error(`action not found: '${name}'`);
+                return idx;
+            }
+            var names = scripts.names,
+                from = dots[0] ? find(dots[0]) : 0,
+                to = dots[1] ? find(dots[1]) : Infinity;
+            return names.slice(from, to + 1);
+        }
+        if (dots.length > 2) throw new Error(`too many dots: '${nm}'`);
+    }));
 }
 
 async function runActions(batch: Batch, actions: string[]) {
+    console.log('Running:', actions);
+
     for (let action of actions) {
-        var { shell, job } = batch.startLocalJob(action);
+        var {shell, job} = batch.startLocalJob(action);
         shell.pipe(<any>process.stdout);
-        await job;
+        var {status} = await job;
+        if (status !== 'ok') break;
     }
 }
 
