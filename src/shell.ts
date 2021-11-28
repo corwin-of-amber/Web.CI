@@ -38,7 +38,11 @@ class Shell extends EventEmitter {
 
         var {cmds, stdin} = this.interp(cmd);
 
-        if (cmds.length != 1) throw new Error('not implemented'); // sorry ma
+        if (cmds.length == 0) return; // nop
+        else if (cmds.length > 1) {
+            console.log(cmds);
+            throw new Error('not implemented'); // sorry ma
+        }
 
         var {args: [file, ...args], env} = cmds[0];
 
@@ -73,10 +77,15 @@ class Shell extends EventEmitter {
         }
     }
 
-    /** handles `<<` input redirection */
+    /**
+     * Handles line comments (`#`) and `<<` input redirection.
+     */
     preparse(cmd: CommandInput): PreparsedCommand {
         if (Array.isArray(cmd)) {
             for (let i = 0; i < cmd.length; i++) {
+                if (cmd[i].match(/^\s*#/)) {
+                    return {cmd: cmd.slice(0, i)};
+                }
                 var redir = cmd[i].match(/^(.*)<<\s*$/);
                 if (redir) {
                     return {
@@ -86,6 +95,7 @@ class Shell extends EventEmitter {
                 }
             }
         }
+        else if (cmd.match(/^\s*#/)) return {cmd: []};
         return {cmd};
     }
 
@@ -96,6 +106,7 @@ class Shell extends EventEmitter {
 
     _parse(cmd: CommandInput): Expansion.Statement.Command[] {
         if (Array.isArray(cmd)) cmd = cmd.join(' '); // this is needed because quotes may span multiple lines
+        if (cmd.match(/^\s*$/)) return [];
         var arrmo = cmd.match(/^(\w+)=\(/);
         return arrmo ? [this._arrayAssign(cmd, arrmo)] : shellParse(cmd);
     }
@@ -374,4 +385,4 @@ if (typeof window === 'object')
     Object.assign(window, {shellQuote, shellParse});
 
 
-export { Shell, Env }
+export { Shell, Env, CommandOptions, CommandExit }
