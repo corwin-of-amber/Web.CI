@@ -1,0 +1,15 @@
+{
+  "scripts": {
+    "set-variables": [
+      "A=19",
+      "B=( 99   98   97 )",
+      "C=( '99   97' 96 )"
+    ],
+    "use-variables": [
+      "echo $A",
+      "echo $B",
+      "echo $C",
+      "echo \"$C\"x"
+    ]
+  }
+}

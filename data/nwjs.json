@@ -47,18 +47,18 @@
         "    .gclient"
       ],
       {
-        "_": "# git clone --depth=1 -b $BRANCH https://github.com/nwjs/nw.js src/content/nw",
+        "_": "git clone --depth=1 -b $BRANCH https://github.com/nwjs/nw.js src/content/nw",
         "fail" : "continue"
       },
       {
-        "_": "# git clone --depth=1 -b $BRANCH https://github.com/nwjs/node src/third_party/node-nw",
+        "_": "git clone --depth=1 -b $BRANCH https://github.com/nwjs/node src/third_party/node-nw",
         "fail" : "continue"
       },
       {
-        "_": "# git clone --depth=1 -b $BRANCH https://github.com/nwjs/v8 src/v8",
+        "_": "git clone --depth=1 -b $BRANCH https://github.com/nwjs/v8 src/v8",
         "fail" : "continue"
       },
-      "gclient sync --no-history --shallow --with_branch_heads"
+      "gclient sync --with_branch_heads"
     ],
     "configure": [
         "cd src",
