@@ -93,7 +93,9 @@
         "  puts(NW_VERSION_STRING);",
         "  return 0;",
         "}"
-      ]
+      ],
+      "V=$(./a.out)",
+      "tar Jcf nw-$V-osx-arm64.tar.xz --strip-components=3 src/out/nw/nwjs.app"
     ]
   }
 }

@@ -1,0 +1,13 @@
+{
+  "scripts": {
+    "command-expansion": [
+      [
+        "tee hello.sh <<",
+        "echo hi-there"
+      ],
+      "chmod +x hello.sh",
+      "V=$(./hello.sh)",
+      "echo tar $V"
+    ]
+  }
+}

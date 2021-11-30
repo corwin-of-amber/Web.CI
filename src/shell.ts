@@ -34,9 +34,15 @@ class Shell extends EventEmitter {
     }
 
     async _run(cmd: CommandInput, opts: CommandOptions = {}) {
-        this.env['PWD'] = this.cwd;
+         return await this._runExpanded(cmd, this.interp(cmd), opts);
+    }
 
-        var {cmds, stdin} = this.interp(cmd);
+    async _runParsed(cmd: CommandInput, parsed: ParsedCommand, opts: CommandOptions = {}) {
+        return await this._runExpanded(cmd, this._interpParsed(parsed), opts);
+   }
+
+    async _runExpanded(cmd: CommandInput, ecmd: ExpandedCommand, opts: CommandOptions = {}) {
+        var {cmds, stdin} = ecmd;
 
         if (cmds.length == 0) return; // nop
         else if (cmds.length > 1) {
@@ -77,6 +83,16 @@ class Shell extends EventEmitter {
         }
     }
 
+    fork(): Shell
+    fork<T extends Shell>(child: T): T
+
+    fork(child = new Shell) {
+        child.cwd = this.cwd;
+        child.env = {...this.env};
+        child.term = {...this.term};
+        return child;
+    }
+
     /**
      * Handles line comments (`#`) and `<<` input redirection.
      */
@@ -112,29 +128,39 @@ class Shell extends EventEmitter {
     }
 
     interp(cmd: CommandInput): ExpandedCommand {
-        var parsed = this.parse(cmd),
-            cmds = parsed.cmds.map(cmd => this._interp(cmd));
+        return this._interpParsed(this.parse(cmd));
+    }
+
+    _interpParsed(parsed: ParsedCommand) {
+        this.env['PWD'] = this.cwd;  // needed for variable expansion
+        var cmds = parsed.cmds.map(cmd => this._interp(cmd));
         return {cmds, stdin: parsed.stdin};
     }
 
     _interp(cmd: Expansion.Statement): {args: string[], env: Env} {
         if (Expansion.Statement.is(cmd, 'command')) {
             return {
-                args: Expansion.eval_([cmd.command, ...cmd.args], this.env),
-                env: mapValues(cmd.env, v => Expansion.evalOne(v, this.env).join(''))
+                args: this._eval([cmd.command, ...cmd.args]),
+                env: mapValues(cmd.env, v => this._eval(v).join(''))
             }
         }
         else if (Expansion.Statement.is(cmd, 'variableAssignment')) {
             var value = Array.isArray(cmd.value) ? cmd.value : [cmd.value];
             return {
                 args: [],
-                env: {[cmd.name]: Expansion.eval_(value, this.env).join(' ')}
+                env: {[cmd.name]: this._eval(value).join(' ')}
             }
         }
         else {
             console.warn('shell: cannot interpret', cmd);
             return {args: [], env: {}}
         }
+    }
+
+    _eval(cmd: Expansion.Arg | Expansion.Arg[]) {
+        var subsh = (cmds: Expansion.Statement[]) => this.subshell(cmds);
+        return Array.isArray(cmd) ? Expansion.eval_(cmd, this.env, subsh)
+            : Expansion.evalOne(cmd, this.env, subsh);
     }
 
     /** parse array assignment, which is not natively supported by shell-parse */
@@ -217,12 +243,57 @@ class Shell extends EventEmitter {
             }));
     }
 
+    subshell(cmds: Expansion.Statement[]) {
+        var subsh = this.fork(new SynchronousShell());
+        subsh.on('data', d => console.log('***', d));
+        subsh._runParsed(null, {cmds});
+        return subsh.captured;
+    }
+
     builtinCmds = {
         cd: (args: string[]) => {
             if (args.length != 1)
                 throw new Error('cd: wrong number of arguments');
             this.cwd = path.resolve(this.cwd, args[0])
         }
+    }
+}
+
+/**
+ * A synchronous version of `Shell` for running subcommands during expansion.
+ * 
+ * @ops Command substitution should probably be deferred until later, when the
+ * command is actually executed.
+ */
+class SynchronousShell extends Shell {
+    _captured: string[] = []
+
+    spawn(file: string, args: string[] = [], env: Env = {},
+          stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
+
+        assert(!stdin, 'not implemented');
+
+        var ret = child_process.spawnSync(file, args,{
+            cwd: this.cwd,
+            env: {...this.env, ...env},
+            stdio: ['pipe', 'pipe', 'pipe'],
+            ...options
+        });
+        if (ret.error)
+            console.warn(`\n[in subshell] ${ret.error}`);
+
+        if (ret.stdout)
+            this._captured.push(ret.stdout.toString('utf-8'));
+
+        if (ret.stderr?.length > 0)
+            console.warn(`\n[in subshell] ${ret.stderr.toString('utf-8')}`);
+
+        // Swallows any errors
+        return Promise.resolve({signal: 0, exitCode: 0});
+    }
+
+    get captured() {
+        return this._captured.join('');
     }
 }
 
@@ -255,11 +326,11 @@ type ExpandedCommand = {
 
 namespace Expansion {
 
-    export function eval_(args: Arg[], env: Env) {
-        return [].concat(...args.map(a => evalOne(a, env)));
+    export function eval_(args: Arg[], env: Env, sh?: (cmds: Statement[]) => string) {
+        return [].concat(...args.map(a => evalOne(a, env, sh)));
     }
 
-    export function evalOne(arg: Arg, env: Env): string[] {
+    export function evalOne(arg: Arg, env: Env, sh?: (cmds: Statement[]) => string): string[] {
         if (Arg.is(arg, 'literal')) {
             return [arg.value];
         }
@@ -274,9 +345,12 @@ namespace Expansion {
             let v = env[arg.expression];
             return v ? [v] : [];
         }
+        else if (Arg.is(arg, 'commandSubstitution')) {
+            return [cleanup(sh?.(arg.commands)) ?? '<-n/a->'];
+        }
         else if (Arg.is(arg, 'concatenation')) {
             /** @todo stub; assumes all expansions are zero- or one-length */
-            let v = eval_(arg.pieces, env);
+            let v = eval_(arg.pieces, env, sh);
             return v.length ? [v.join('')] : [];
         }
         else if (Arg.is(arg, 'array')) {
@@ -287,6 +361,10 @@ namespace Expansion {
             console.log('shell: cannot evaluate', arg);
             return [];
         }
+    }
+
+    function cleanup(s: string) {
+        return s && s.replace(/\n+/g, '').trim();
     }
 
     function stringify(arg: Arg) {
@@ -353,6 +431,10 @@ namespace Expansion {
             type: 'variableSubstitution'
             expression: string
         }
+        export interface CommandSubst {
+            type: 'commandSubstitution'
+            commands: Statement[]
+        }
         export interface Concat extends Arg {
             type: 'concatenation'
             pieces: Arg[]
@@ -365,6 +447,7 @@ namespace Expansion {
         export function is(arg: Arg, type: 'literal'): arg is Literal;
         export function is(arg: Arg, type: 'variable'): arg is Variable;
         export function is(arg: Arg, type: 'variableSubstitution'): arg is VariableSubst;
+        export function is(arg: Arg, type: 'commandSubstitution'): arg is CommandSubst;
         export function is(arg: Arg, type: 'concatenation'): arg is Concat;
         export function is(arg: Arg, type: 'array'): arg is Array;
         export function is(arg: Arg, type: string) {
