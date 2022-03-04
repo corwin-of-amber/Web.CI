@@ -2,6 +2,9 @@
   "name": "web-ci",
   "version": "0.1.0",
   "main": "build/kremlin/index.html",
+  "scripts": {
+    "build:cli": "kremlin -o build/cli src/cli.ts"
+  },
   "dependencies": {
     "colors": "^1.4.0",
     "commander": "^8.3.0",

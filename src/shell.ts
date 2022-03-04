@@ -46,7 +46,6 @@ class Shell extends EventEmitter {
 
         if (cmds.length == 0) return; // nop
         else if (cmds.length > 1) {
-            console.log(cmds);
             throw new Error('not implemented'); // sorry ma
         }
 
@@ -169,7 +168,7 @@ class Shell extends EventEmitter {
         if (!clo) throw new Error(`unmatched '('`);
         var value = {
             type: 'array',
-            expression: cmd.substring(mo[0].length, clo.index)
+            expression: this._arrayParse(cmd.substring(mo[0].length, clo.index))
         };
         return {
             type: 'variableAssignment',
@@ -177,6 +176,12 @@ class Shell extends EventEmitter {
             value,
             control: ';', next: null
         }
+    }
+
+    _arrayParse(substr: string) {
+        var parsed = shellParse('x ' + substr);
+        assert(parsed.length === 1 && parsed[0].type === 'command');
+        return parsed[0].args;
     }
 
     reportStart(cmd: CommandInput) {
@@ -354,8 +359,7 @@ namespace Expansion {
             return v.length ? [v.join('')] : [];
         }
         else if (Arg.is(arg, 'array')) {
-            /** @todo a bit frustrating that this cannot be done with shell-parse atm */
-            return shellQuote.parse(arg.expression);
+            return eval_(arg.expression, env, sh)
         }
         else {
             console.log('shell: cannot evaluate', arg);
@@ -441,7 +445,7 @@ namespace Expansion {
         }
         export interface Array extends Arg {
             type: 'array'
-            expression: string
+            expression: Arg[]
         }
 
         export function is(arg: Arg, type: 'literal'): arg is Literal;

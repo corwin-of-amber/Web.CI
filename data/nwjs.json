@@ -1,8 +1,11 @@
 {
   "scripts": {
     "options": [
-      "BRANCH=nw59",
-      "TAG=nw-v0.59.1",
+      "BRANCH=nw61",
+      "TAG=nw-v0.61.0",
+      "SDK=true",
+      "SDKN=1",
+      "PKG=nwjs-sdk",
       [
         "BUILD_ARGS=(",
         "  is_debug=false",
@@ -14,13 +17,14 @@
         "  enable_stripping=true",
         "  enable_dsyms=true",
         "  enable_precompiled_headers=false",
+        "  nwjs_sdk=$SDK",
         ")"
       ],
       [
         "GYP_ARGS=(",
         "  target_arch=arm64",
         "  building_nw=1",
-        "  nwjs_sdk=1",
+        "  nwjs_sdk=$SDKN",
         "  disable_nacl=0",
         "  mac_breakpad=1",
         "  buildtype=Official",
@@ -96,7 +100,40 @@
         "}"
       ],
       "V=$(./a.out)",
-      "tar Jcf nw-$V-osx-arm64.tar.xz --strip-components=3 src/out/nw/nwjs.app"
+      "tar Jcf $PKG-$V-osx-arm64.tar.xz --strip-components=3 src/out/nw/nwjs.app"
+    ],
+    "dist": [
+      "cd src",
+      "ninja -C out/nw nwjc payload chromedriver",
+      "touch out/nw/nwjs.breakpad.tar",
+      "touch out/nw/v8_context_snapshot.x86_64.bin",
+      "ninja -C out/nw dist",
+      "mv out/nw/dist ."
+    ]
+  },
+  "optional-scripts": {
+    "clean": [
+      "rm -rf src/out"
+    ],
+    "ffmpeg": [
+      [
+        "BUILD_ARGS=(",
+        "  is_debug=false",
+        "  is_component_ffmpeg=true",
+        "  target_cpu='\"arm64\"'",
+        "  symbol_level=1",
+        "  proprietary_codecs=true",
+        "  ffmpeg_branding='\"Chrome\"'",
+        "  enable_stripping=true",
+        "  enable_dsyms=true",
+        "  enable_precompiled_headers=false",
+        ")"
+      ],
+      "cd src",
+      "gn gen out/nw \"--args=$BUILD_ARGS\"",
+      "ninja -C out/nw libffmpeg.dylib",
+      "V=$(../a.out)",
+      "tar Jcf ../nwjs-$V-ffmpeg-osx-arm64.tar.gz out/nw/libffmpeg.dylib"
     ]
   }
 }

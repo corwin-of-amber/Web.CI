@@ -2,6 +2,7 @@
 .*.swp
 node_modules
 _npmlink
+_dist
 /build
 /*.tgz
 

@@ -95,10 +95,16 @@ namespace Batch {
 
 
 class Scripts {
-    defs: {scripts: {[name: string]: string[]}}
+    defs: {
+        scripts: {[name: string]: string[]},
+        optionalScripts: {[name: string]: string[]}
+    }
 
     constructor(fn: string) {
         this.defs = JSON.parse(fs.readFileSync(fn, 'utf-8'));
+        /* kebab-case */
+        if (this.defs['optional-scripts'])
+            this.defs.optionalScripts = this.defs['optional-scripts'];
     }
 
     get names() {
@@ -106,7 +112,8 @@ class Scripts {
     }
 
     get(name: string) {
-        return this.defs.scripts[name] || [name];
+        return this.defs.scripts[name] ??
+               this.defs.optionalScripts[name] ?? [name];
     }
 }
 
