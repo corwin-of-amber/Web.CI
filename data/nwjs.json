@@ -1,8 +1,8 @@
 {
   "scripts": {
     "options": [
-      "BRANCH=nw61",
-      "TAG=nw-v0.61.0",
+      "BRANCH=nw62",
+      "TAG=nw-v0.62.0",
       "SDK=true",
       "SDKN=1",
       "PKG=nwjs-sdk",
@@ -52,7 +52,7 @@
         "    .gclient"
       ],
       {
-        "_": "git clone --depth=1 -b $TAG https://github.com/nwjs/nw.js src/content/nw",
+        "_": "git clone --depth=1 -c advice.detachedHead=false -b $TAG https://github.com/nwjs/nw.js src/content/nw",
         "fail" : "continue"
       },
       {
@@ -100,7 +100,7 @@
         "}"
       ],
       "V=$(./a.out)",
-      "tar Jcf $PKG-$V-osx-arm64.tar.xz --strip-components=3 src/out/nw/nwjs.app"
+      "tar Jcf $PKG-v$V-osx-arm64.tar.xz --strip-components=3 src/out/nw/nwjs.app"
     ],
     "dist": [
       "cd src",
@@ -133,7 +133,7 @@
       "gn gen out/nw \"--args=$BUILD_ARGS\"",
       "ninja -C out/nw libffmpeg.dylib",
       "V=$(../a.out)",
-      "tar Jcf ../nwjs-$V-ffmpeg-osx-arm64.tar.gz out/nw/libffmpeg.dylib"
+      "tar Jcf ../nwjs-$V-ffmpeg-osx-arm64.tar.gz --strip-components=2 out/nw/libffmpeg.dylib"
     ]
   }
 }
