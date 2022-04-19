@@ -1,8 +1,8 @@
 {
   "scripts": {
     "options": [
-      "BRANCH=nw62",
-      "TAG=nw-v0.62.0",
+      "BRANCH=nw63",
+      "TAG=nw-v0.63.1",
       "SDK=true",
       "SDKN=1",
       "PKG=nwjs-sdk",
@@ -113,7 +113,7 @@
   },
   "optional-scripts": {
     "clean": [
-      "rm -rf src/out"
+      "rm -rf src/out src/dist"
     ],
     "ffmpeg": [
       [
@@ -134,6 +134,23 @@
       "ninja -C out/nw libffmpeg.dylib",
       "V=$(../a.out)",
       "tar Jcf ../nwjs-$V-ffmpeg-osx-arm64.tar.gz --strip-components=2 out/nw/libffmpeg.dylib"
+    ]
+  },
+  "recipes": {
+    "ci": [
+      "@ -c options... upload",
+      "@ clean",
+      {"_": [
+        "SDK=false",
+        "SDKN=0",
+        "PKG=nwjs"
+      ], "precedence": "override"},
+      "@ options depot configure... upload"
+    ],
+    "upload": [
+      "O=shachari@lamport.cs.technion.ac.il:var/data/nwjs-archive",
+      "scp nwjs-* $O",
+      "scp src/dist/nw-* src/dist/nwjs-* $O"
     ]
   }
 }

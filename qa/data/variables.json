@@ -10,6 +10,16 @@
       "echo $B",
       "echo $C",
       "echo \"$C\"x"
+    ],
+    "set-and-use": [
+      "A=21",
+      "Z=ork",
+      "echo $A $Z"
+    ],
+    "override": [
+      {"_": [
+        "Z=erg"
+      ], "precedence": "override"}
     ]
   }
 }

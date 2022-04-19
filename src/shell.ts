@@ -13,6 +13,7 @@ class Shell extends EventEmitter {
     cwd: string
     env: Env
     vars: Env = {}
+    varsPrec: VariablePrecedence = {}
     term: {}
 
     constructor() {
@@ -52,9 +53,12 @@ class Shell extends EventEmitter {
         var {args: [file, ...args], env} = cmds[0];
 
         if (!file) {
-            /** @todo add distinction between shell vars and env vars (`export`) */
+            if (opts.precedence !== 'override')
+                env = filterKeys(env, k => this.varsPrec[k] != 'override');
             Object.assign(this.vars, env);
             Object.assign(this.env, env);
+            Object.assign(this.varsPrec,
+                mapValues(env, _ => opts.precedence ?? 'export'));
             return;
         }
 
@@ -255,6 +259,16 @@ class Shell extends EventEmitter {
         return subsh.captured;
     }
 
+    get state(): ShellState {
+        return {env: this.env, vars: this.vars, varsPrec: this.varsPrec};
+    }
+
+    set state(s: ShellState) {
+        this.env = {...s.env};
+        this.vars = {...s.vars};
+        this.varsPrec = {...s.varsPrec};
+    }
+
     builtinCmds = {
         cd: (args: string[]) => {
             if (args.length != 1)
@@ -302,12 +316,15 @@ class SynchronousShell extends Shell {
     }
 }
 
+type ShellState = {env: Env, vars: Env, varsPrec: VariablePrecedence};
+
 //type Arg = string | {pattern?: string, comment?: string, op?: string};
 //type Arglet = string | {op?: string};
 type Env = {[varname: string]: string};
+type VariablePrecedence = {[varname: string]: 'local' | 'export' | 'override'};
 type ScriptEntry = CommandInput | {_: CommandInput} & CommandOptions;
 type CommandInput = string | string[];
-type CommandOptions = {fail?: 'stop' | 'continue'};
+type CommandOptions = {fail?: 'stop' | 'continue', precedence?: 'override'};
 type CommandExit = {exitCode: number, signal?: number | NodeJS.Signals};
 
 type PreparsedCommand = {
@@ -467,9 +484,15 @@ function mapValues<T, S>(o: {[k: string]: T}, f: (v: T) => S): {[k: string]: S} 
     )
 }
 
+function filterKeys<T>(o: {[k: string]: T}, p: (k: string) => boolean): {[k: string]: T} {
+    return Object.fromEntries(
+        Object.entries(o).filter(([k, v]) => p(k))
+    )
+}
+
 // for debugging
 if (typeof window === 'object')
     Object.assign(window, {shellQuote, shellParse});
 
 
-export { Shell, Env, CommandOptions, CommandExit }
+export { Shell, ShellState, Env, CommandOptions, CommandExit }

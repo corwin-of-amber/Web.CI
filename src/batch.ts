@@ -1,7 +1,7 @@
 import fs from 'fs';
 import assert from 'assert';
 import { EventEmitter } from 'events';
-import { Shell, Env, CommandExit } from './shell';
+import { Shell, ShellState, Env, CommandExit } from './shell';
 
 
 class Batch extends EventEmitter {
@@ -10,7 +10,7 @@ class Batch extends EventEmitter {
 
     scripts: Scripts
 
-    lastState: { env: Env, vars: Env }
+    lastState: ShellState
 
     constructor(opts: Batch.Options = {}) {
         super();
@@ -41,7 +41,7 @@ class Batch extends EventEmitter {
                            startTime, endTime: -1, totalTime: 0};
             try {
                 await shell.runScript(script);
-                this.lastState = {env: shell.env, vars: shell.vars};
+                this.lastState = shell.state;
                 outcome.status = 'ok';
             }
             catch (err) {
@@ -65,10 +65,8 @@ class Batch extends EventEmitter {
             this.buildDir.start();
         }
         shell.cwd = this.buildDir.dir;
-        if (this.lastState) {
-            shell.env = {...this.lastState.env};
-            shell.vars = {...this.lastState.vars};
-        }
+        if (this.lastState)
+            shell.state = this.lastState;
         return shell;
     }
 }
