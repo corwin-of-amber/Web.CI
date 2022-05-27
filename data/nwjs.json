@@ -106,7 +106,7 @@
       "cd src",
       "ninja -C out/nw nwjc payload chromedriver",
       "touch out/nw/nwjs.breakpad.tar",
-      "touch out/nw/v8_context_snapshot.x86_64.bin",
+      "sed -i.bak s/.x86_64.bin/.arm64.bin/ content/nw/tools/package_binaries.py",
       "ninja -C out/nw dist",
       "mv out/nw/dist ."
     ]
