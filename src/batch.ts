@@ -1,7 +1,7 @@
 import fs from 'fs';
 import assert from 'assert';
 import { EventEmitter } from 'events';
-import { Shell, ShellState, Env, CommandExit } from './shell';
+import { Shell, Env, CommandExit } from './shell';
 
 
 class Batch extends EventEmitter {
@@ -10,7 +10,7 @@ class Batch extends EventEmitter {
 
     scripts: Scripts
 
-    lastState: ShellState
+    lastState: Shell.State
 
     constructor(opts: Batch.Options = {}) {
         super();
@@ -57,6 +57,18 @@ class Batch extends EventEmitter {
         return {shell, job};
     }
 
+    async runActions(actions: string[], out?: Shell, state?: Shell.State) {    
+        if (state) this.lastState = state;
+        
+        for (let action of actions) {
+            var {shell, job} = this.startLocalJob(action);
+            out ? shell.forward(out)
+                : shell.pipe(<any>process.stdout);
+            var {status} = await job;
+            if (status !== 'ok') break;
+        }
+    }
+
     createLocalShell() {
         var shell = this.opts.dry ? new Batch.DryRunShell() : new Shell();
         if (this.buildDir.state == BuildDirectory.State.UNINIT) {
@@ -67,6 +79,9 @@ class Batch extends EventEmitter {
         shell.cwd = this.buildDir.dir;
         if (this.lastState)
             shell.state = this.lastState;
+        shell.builtinCmds['@'] = async (args: string[]) => {
+            await this.runActions(args, shell, shell.state);
+        };
         return shell;
     }
 }
@@ -94,15 +109,16 @@ namespace Batch {
 
 class Scripts {
     defs: {
-        scripts: {[name: string]: string[]},
-        optionalScripts: {[name: string]: string[]}
+        "scripts": Scripts.Bundle
+        "optional-scripts": Scripts.Bundle
+        "recipes": Scripts.Bundle
     }
 
     constructor(fn: string) {
         this.defs = JSON.parse(fs.readFileSync(fn, 'utf-8'));
         /* kebab-case */
-        if (this.defs['optional-scripts'])
-            this.defs.optionalScripts = this.defs['optional-scripts'];
+        //if (this.defs['optional-scripts'])
+        //    this.defs.optionalScripts = this.defs['optional-scripts'];
     }
 
     get names() {
@@ -110,9 +126,16 @@ class Scripts {
     }
 
     get(name: string) {
-        return this.defs.scripts[name] ??
-               this.defs.optionalScripts[name] ?? [name];
+        var searchIn = Scripts.SECTIONS;
+        return searchIn.map(k => this.defs[k]?.[name])
+                       .find(x => x) ?? [name];
     }
+}
+
+namespace Scripts {
+    export type Sections = 'scripts' | 'optional-scripts' | 'recipes';
+    export const SECTIONS = ['scripts', 'optional-scripts', 'recipes'];
+    export type Bundle = {[name: string]: string[]};
 }
 
 

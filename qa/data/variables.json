@@ -15,11 +15,14 @@
       "A=21",
       "Z=ork",
       "echo $A $Z"
-    ],
+    ]
+  },
+  "recipes": {
     "override": [
       {"_": [
         "Z=erg"
-      ], "precedence": "override"}
+      ], "precedence": "override"},
+      "@ set-and-use"
     ]
   }
 }

@@ -40,7 +40,7 @@ class Shell extends EventEmitter {
 
     async _runParsed(cmd: CommandInput, parsed: ParsedCommand, opts: CommandOptions = {}) {
         return await this._runExpanded(cmd, this._interpParsed(parsed), opts);
-   }
+    }
 
     async _runExpanded(cmd: CommandInput, ecmd: ExpandedCommand, opts: CommandOptions = {}) {
         var {cmds, stdin} = ecmd;
@@ -211,6 +211,11 @@ class Shell extends EventEmitter {
         return this;
     }
 
+    forward(other: Shell) {
+        this.on('data', d => other.emit('data', d));
+        this.on('message', d => other.emit('message', d));
+    }
+
     spawn(file: string, args: string[] = [], env: Env = {},
           stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
         return stdin ? this.spawnChild(file, args, env, stdin, options)
@@ -259,11 +264,11 @@ class Shell extends EventEmitter {
         return subsh.captured;
     }
 
-    get state(): ShellState {
+    get state(): Shell.State {
         return {env: this.env, vars: this.vars, varsPrec: this.varsPrec};
     }
 
-    set state(s: ShellState) {
+    set state(s: Shell.State) {
         this.env = {...s.env};
         this.vars = {...s.vars};
         this.varsPrec = {...s.varsPrec};
@@ -275,6 +280,13 @@ class Shell extends EventEmitter {
                 throw new Error('cd: wrong number of arguments');
             this.cwd = path.resolve(this.cwd, args[0])
         }
+    }
+}
+
+namespace Shell {
+    export type State = {env: Env, vars: Env, varsPrec: VariablePrecedence};
+    export type BuiltinCmds = {
+        [name: string]: (args: string[]) => void | Promise<void>
     }
 }
 
@@ -315,8 +327,6 @@ class SynchronousShell extends Shell {
         return this._captured.join('');
     }
 }
-
-type ShellState = {env: Env, vars: Env, varsPrec: VariablePrecedence};
 
 //type Arg = string | {pattern?: string, comment?: string, op?: string};
 //type Arglet = string | {op?: string};
@@ -495,4 +505,4 @@ if (typeof window === 'object')
     Object.assign(window, {shellQuote, shellParse});
 
 
-export { Shell, ShellState, Env, CommandOptions, CommandExit }
+export { Shell, Env, CommandOptions, CommandExit }

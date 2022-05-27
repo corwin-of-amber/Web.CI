@@ -62,12 +62,7 @@ function parseActions(scripts: Scripts, spec: string[]) {
 async function runActions(batch: Batch, actions: string[]) {
     console.log('Running:', actions);
 
-    for (let action of actions) {
-        var {shell, job} = batch.startLocalJob(action);
-        shell.pipe(<any>process.stdout);
-        var {status} = await job;
-        if (status !== 'ok') break;
-    }
+    batch.runActions(actions);
 }
 
 function formatDuration(millis: number) {
