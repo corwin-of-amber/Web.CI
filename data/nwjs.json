@@ -1,8 +1,8 @@
 {
   "scripts": {
     "options": [
-      "BRANCH=nw63",
-      "TAG=nw-v0.63.1",
+      "BRANCH=nw65",
+      "TAG=nw-v0.65.0",
       "SDK=true",
       "SDKN=1",
       "PKG=nwjs-sdk",
@@ -137,6 +137,18 @@
     ]
   },
   "recipes": {
+    "sdk": [
+      "@ options... upload"
+    ],
+    "nosdk": [
+      "@ clean",
+      {"_": [
+        "SDK=false",
+        "SDKN=0",
+        "PKG=nwjs"
+      ], "precedence": "override"},
+      "@ options depot configure... upload"
+    ],
     "ci": [
       "@ -c options... upload",
       "@ clean",

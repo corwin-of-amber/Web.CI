@@ -69,6 +69,26 @@ class Batch extends EventEmitter {
         }
     }
 
+    parseActions(spec: string[]) {
+        if (spec.length === 0) return this.scripts.names;
+        else return [].concat(...spec.map(nm => {
+            var dots = nm.split(/\.\.+/);
+            if (dots.length == 1) return [nm];
+            else if (dots.length == 2) {
+                function find(name: string) {
+                    var idx = names.indexOf(name);
+                    if (idx < 0) throw new Error(`action not found: '${name}'`);
+                    return idx;
+                }
+                var names = this.scripts.names,
+                    from = dots[0] ? find(dots[0]) : 0,
+                    to = dots[1] ? find(dots[1]) : Infinity;
+                return names.slice(from, to + 1);
+            }
+            if (dots.length > 2) throw new Error(`too many dots: '${nm}'`);
+        }));
+    }
+
     createLocalShell() {
         var shell = this.opts.dry ? new Batch.DryRunShell() : new Shell();
         if (this.buildDir.state == BuildDirectory.State.UNINIT) {
@@ -80,7 +100,8 @@ class Batch extends EventEmitter {
         if (this.lastState)
             shell.state = this.lastState;
         shell.builtinCmds['@'] = async (args: string[]) => {
-            await this.runActions(args, shell, shell.state);
+            let actions = this.parseActions(args);
+            await this.runActions(actions, shell, shell.state);
         };
         return shell;
     }

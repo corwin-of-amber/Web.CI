@@ -154,6 +154,12 @@ class Shell extends EventEmitter {
                 env: {[cmd.name]: this._eval(value).join(' ')}
             }
         }
+        else if (Array.isArray(cmd)) {
+            let env = {};
+            for (let assign of cmd)
+                Object.assign(env, this._interp(assign).env);
+            return {args: [], env}
+        }
         else {
             console.warn('shell: cannot interpret', cmd);
             return {args: [], env: {}}

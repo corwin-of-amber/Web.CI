@@ -14,13 +14,15 @@
     "set-and-use": [
       "A=21",
       "Z=ork",
-      "echo $A $Z"
+      "echo $A $Z $Q"
     ]
   },
   "recipes": {
     "override": [
       {"_": [
-        "Z=erg"
+        "Z=erg",
+        "Q=9",
+        "QT=Q"
       ], "precedence": "override"},
       "@ set-and-use"
     ]
