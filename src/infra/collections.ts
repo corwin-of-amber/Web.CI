@@ -10,7 +10,7 @@ class ViviMap<K, V> extends Map<K, V> {
     get(key: K) {
         var v = super.get(key);
         if (v === undefined)
-            this.set(key, v = this.factory(key));
+            super.set(key, v = this.factory(key));
         return v;
     }
 }

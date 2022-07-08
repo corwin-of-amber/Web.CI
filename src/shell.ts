@@ -167,9 +167,8 @@ class Shell extends EventEmitter {
     }
 
     _eval(cmd: Expansion.Arg | Expansion.Arg[]) {
-        var subsh = (cmds: Expansion.Statement[]) => this.subshell(cmds);
-        return Array.isArray(cmd) ? Expansion.eval_(cmd, this.env, subsh)
-            : Expansion.evalOne(cmd, this.env, subsh);
+        return Array.isArray(cmd) ? Expansion.eval_(cmd, this)
+            : Expansion.evalOne(cmd, this);
     }
 
     /** parse array assignment, which is not natively supported by shell-parse */
@@ -364,35 +363,44 @@ type ExpandedCommand = {
 
 namespace Expansion {
 
-    export function eval_(args: Arg[], env: Env, sh?: (cmds: Statement[]) => string) {
-        return [].concat(...args.map(a => evalOne(a, env, sh)));
+    export interface ShellInterface {
+        env: Env
+        cwd: string
+        subshell?: (cmds: Statement[]) => string
     }
 
-    export function evalOne(arg: Arg, env: Env, sh?: (cmds: Statement[]) => string): string[] {
+    export function eval_(args: Arg[], sh: ShellInterface) {
+        return [].concat(...args.map(a => evalOne(a, sh)));
+    }
+
+    export function evalOne(arg: Arg, sh: ShellInterface): string[] {
         if (Arg.is(arg, 'literal')) {
             return [arg.value];
         }
         else if (Arg.is(arg, 'variable')) {
-            let v = env[arg.name];
+            let v = sh.env[arg.name];
             /** @todo need to distinguish between quoted an unquoted; */
             /* currently, `shell-parse` does not convey this information. */
             return v ? [v] : [];
         }
         else if (Arg.is(arg, 'variableSubstitution')) {
             /** @todo stub; need to parse the expression */
-            let v = env[arg.expression];
+            let v = sh.env[arg.expression];
             return v ? [v] : [];
         }
         else if (Arg.is(arg, 'commandSubstitution')) {
-            return [cleanup(sh?.(arg.commands)) ?? '<-n/a->'];
+            return [cleanup(sh.subshell?.(arg.commands)) ?? '<-n/a->'];
         }
         else if (Arg.is(arg, 'concatenation')) {
             /** @todo stub; assumes all expansions are zero- or one-length */
-            let v = eval_(arg.pieces, env, sh);
+            let v = eval_(arg.pieces, sh);
             return v.length ? [v.join('')] : [];
         }
         else if (Arg.is(arg, 'array')) {
-            return eval_(arg.expression, env, sh)
+            return eval_(arg.expression, sh)
+        }
+        else if (Arg.is(arg, 'glob')) {
+            return glob.sync(arg.value, {cwd: sh.cwd});
         }
         else {
             console.log('shell: cannot evaluate', arg);
@@ -480,6 +488,10 @@ namespace Expansion {
             type: 'array'
             expression: Arg[]
         }
+        export interface Glob extends Arg {
+            type: 'glob'
+            value: string
+        }
 
         export function is(arg: Arg, type: 'literal'): arg is Literal;
         export function is(arg: Arg, type: 'variable'): arg is Variable;
@@ -487,6 +499,7 @@ namespace Expansion {
         export function is(arg: Arg, type: 'commandSubstitution'): arg is CommandSubst;
         export function is(arg: Arg, type: 'concatenation'): arg is Concat;
         export function is(arg: Arg, type: 'array'): arg is Array;
+        export function is(arg: Arg, type: 'glob'): arg is Glob;
         export function is(arg: Arg, type: string) {
             return arg.type === type;
         }
