@@ -1,11 +1,13 @@
 {
   "scripts": {
     "options": [
-      "BRANCH=nw65",
-      "TAG=nw-v0.65.0",
+      "BRANCH=nw67",
+      "TAG=nw-v0.67.1",
       "SDK=true",
       "SDKN=1",
       "PKG=nwjs-sdk",
+      "CCACHE_DIR=/tmp/ccache",
+      "CCACHE_SLOPPINESS=time_macros",
       [
         "BUILD_ARGS=(",
         "  is_debug=false",
@@ -18,6 +20,7 @@
         "  enable_dsyms=true",
         "  enable_precompiled_headers=false",
         "  nwjs_sdk=$SDK",
+        "  cc_wrapper='\"env CCACHE_SLOPPINESS=time_macros ccache\"'",
         ")"
       ],
       [
@@ -63,22 +66,25 @@
         "_": "git clone --depth=1 -b $BRANCH https://github.com/nwjs/v8 src/v8",
         "fail" : "continue"
       },
-      "gclient sync --with_branch_heads"
+      "DEPOT_TOOLS_UPDATE=0 gclient sync --with_branch_heads"
     ],
     "configure": [
         "cd src",
         "gn gen out/nw \"--args=$BUILD_ARGS\"",
 
-        "# - fix python version",
+        "# - fix python version (is this still needed?)",
         "sed -i.bak 's/(python /(python2 /' third_party/node-nw/common.gypi",
-        "sed -i.bak 's/ python$/ python2/' tools/gyp/pylib/gyp/mac_tool.py",
+        "# sed -i.bak 's/ python$/ python2/' tools/gyp/pylib/gyp/mac_tool.py",
 
         "GYP_DEFINES=\"$GYP_ARGS\"",
+        "GYP_GENERATORS=ninja",
+        "GYP_GENERATOR_FLAGS=output_dir=out",
+        "GYP_CHROMIUM_NO_ACTION=0",
 
         [
-          "GYP_CHROMIUM_NO_ACTION=0 python2 ./build/gyp_chromium",
-          "   -I third_party/node-nw/common.gypi -D building_nw=1",
-          "    -D clang=1 third_party/node-nw/node.gyp"
+          "python3 third_party/node-nw/tools/gyp/gyp_main.py",
+          "    -I third_party/node-nw/common.gypi -D build_type=Release",
+          "    third_party/node-nw/node.gyp"
         ]
     ],
     "build": [
@@ -115,7 +121,7 @@
     "clean": [
       "rm -rf src/out src/dist"
     ],
-    "ffmpeg": [
+    "build-ffmpeg": [
       [
         "BUILD_ARGS=(",
         "  is_debug=false",
@@ -149,15 +155,13 @@
       ], "precedence": "override"},
       "@ options depot configure... upload"
     ],
+    "ffmpeg": [
+      "@ options depot build-ffmpeg upload"
+    ],
     "ci": [
-      "@ -c options... upload",
-      "@ clean",
-      {"_": [
-        "SDK=false",
-        "SDKN=0",
-        "PKG=nwjs"
-      ], "precedence": "override"},
-      "@ options depot configure... upload"
+      "@ -c sdk",
+      "@ nosdk",
+      "@ ffmpeg"
     ],
     "upload": [
       "O=shachari@lamport.cs.technion.ac.il:var/data/nwjs-archive",
