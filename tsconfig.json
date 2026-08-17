@@ -2,11 +2,11 @@
     "compilerOptions": {
         "target": "es2020",
         "module": "es2020",
-        "moduleResolution": "node",
+        "moduleResolution": "bundler",
         "allowSyntheticDefaultImports": true,
         "esModuleInterop": true,
-        "downlevelIteration": true,
-        "experimentalDecorators": true
+        "experimentalDecorators": true,
+        "strict": false
     },
     "include": ["src"]
 }

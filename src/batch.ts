@@ -14,8 +14,8 @@ class Batch extends EventEmitter {
 
     constructor(opts: Batch.Options = {}) {
         super();
-        this.opts = opts;
-        this.buildDir = new BuildDirectory('/tmp/mannequin');
+        this.opts = {dir: '/tmp/mannequin', ...opts};
+        this.buildDir = new BuildDirectory(this.opts.dir);
     }
 
     loadScripts(fn: string): void
@@ -109,6 +109,7 @@ class Batch extends EventEmitter {
 
 namespace Batch {
     export type Options = {
+        dir?: string
         clean?: boolean
         dry?: boolean
     }
@@ -167,7 +168,8 @@ class BuildDirectory {
     constructor(dir: string) { this.dir = dir; }
 
     clean() {
-        fs.rmSync(this.dir, {recursive: true, force: true});
+        this.state = BuildDirectory.State.UNINIT;
+        return fs.promises.rm(this.dir, {recursive: true, force: true});
     }
 
     start() {

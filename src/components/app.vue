@@ -11,10 +11,14 @@
             </li>
         </ul>
         <div id="area">
+            <div class="area--toolbar" @click="toolbarAction">
+                <button name="start">Start</button>
+                <button name="wipe">Wipe</button>
+            </div>
             <div v-for="action in actions" :key="action"
                 :ref="(el) => registerTab(el, action)" :data-action="action"
                 class="area--tab" :class="{active: action == selected}">
-                <div class="area--terminal" v-once/>
+                <div class="area--terminal" v-once></div>
             </div>
         </div>
     </div>
@@ -53,27 +57,44 @@ span.action--status {
 </style>
 
 <script lang="ts">
-export default {
-    props: ['actions'],
-    data: () => ({selected: undefined, status: new Map}),
-    methods: {
-        selectAction(action: string, ev: MouseEvent) {
-            if (this.selected != action) { // avoid event cycles
-                this.selected = action;
-                this.$emit('select', {action});
-            }
-        },
-        registerTab(el: Element, action: string) {
-            this.tabs.set(action, el)
-        },
-        getTab(action: string) {
-            return this.tabs.get(action);
-        },
-        getTerminal(action: string) {
-            var t = this.getTab(action);
-            return t && t.querySelector('.area--terminal');
+import { Vue, Component, Prop, toNative } from 'vue-facing-decorator';
+
+@Component({
+    emits: ['select', 'action']
+})
+class IApp extends Vue {
+    @Prop actions: any[]
+    selected: any = undefined
+    status = new Map
+    tabs = new Map
+
+    selectAction(action: string, ev?: MouseEvent) {
+        if (this.selected != action) { // avoid event cycles
+            this.selected = action;
+            this.$emit('select', {action});
         }
-    },
-    beforeUpdate() { this.tabs = new Map; }
+    }
+    registerTab(el: Element, action: string) {
+        this.tabs.set(action, el)
+    }
+    getTab(action: string) {
+        return this.tabs.get(action);
+    }
+    getTerminal(action: string) {
+        var t = this.getTab(action);
+        return t && t.querySelector('.area--terminal');
+    }
+
+    toolbarAction(ev: MouseEvent) {
+        let type = (ev.target as HTMLElement)?.getAttribute('name');
+        if (type) this.$emit('action', {type, ev});
+    }
+
+    beforeUpdate() {
+        this.tabs = new Map;
+    }
 }
+
+export { IApp }
+export default toNative(IApp)
 </script>

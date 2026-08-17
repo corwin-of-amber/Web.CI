@@ -1,0 +1,15 @@
+{
+    "scripts": {
+        "download": [
+            "git clone https://github.com/corwin-of-amber/wasi-kernel.git ."
+        ],
+        "build:phase-1": [
+            "SKIP_BIN=1 npm i",
+            "cd phase-1",
+            "npm run build"
+        ],
+        "build": [
+            "npm run build"
+        ]
+    }
+}

@@ -123,7 +123,7 @@ class Shell extends EventEmitter {
         return {cmds: this._parse(pre.cmd), stdin: pre.stdin};
     }
 
-    _parse(cmd: CommandInput): Expansion.Statement.Command[] {
+    _parse(cmd: CommandInput): Expansion.Statement[] {
         if (Array.isArray(cmd)) cmd = cmd.join(' '); // this is needed because quotes may span multiple lines
         if (cmd.match(/^\s*$/)) return [];
         var arrmo = cmd.match(/^(\w+)=\(/);

@@ -116,6 +116,12 @@
     "clean": [
       "rm -rf src/out src/dist"
     ],
+    "update": [
+      "cd src/content/nw",
+      "git clean -f -d -x",
+      "git fetch -t origin $BRANCH",
+      "git reset --hard $TAG"
+    ],
     "build-ffmpeg": [
       [
         "BUILD_ARGS=(",
@@ -140,6 +146,9 @@
   "recipes": {
     "fresh": [
       "@ options depot download"
+    ],
+    "sync": [
+      "@ options depot update download"
     ],
     "sdk": [
       "@ clean",

@@ -1,12 +1,11 @@
-import Vue from 'vue';
+import * as Vue from 'vue';
 import { Terminal } from 'xterm';
 import 'xterm/css/xterm.css';
 
 import './tty.css';
 
 // @ts-ignore
-import appComponent from './components/app.vue';
-import { App } from './components/app';
+import appComponent, { IApp } from './components/app.vue';
 import { Shell } from './shell';
 import { Batch, Scripts } from './batch';
 
@@ -14,7 +13,7 @@ import { ViviMap } from './infra/collections';
 
 
 class DashboardApp {
-    view: App
+    view: IApp
     tabs = new ViviMap<string, Tab>().withFactory(k => this._createTabFor(k))
 
     batch = new Batch
@@ -22,15 +21,17 @@ class DashboardApp {
     constructor(containerId = '#app-container') {
         this.view = Vue.createApp(appComponent, {
                 actions: Vue.reactive([]),
-                onSelect: ({action}: {action: string}) => this.switchTo(action, true)
+                onSelect: ({action}: {action: string}) => this.switchTo(action),
+                onAction: ({type}) => this.onToolbarAction(type)
             })
-            .mount(containerId) as Vue.ComponentPublicInstance & App;
+            .mount(containerId) as IApp;
 
         this.batch.on('scripts:loaded', async () => {
             this.view.actions.push(...this.batch.scripts.names);
-            await Promise.resolve(); // now app has to update...
-            var firstAction = this.batch.scripts.names[0];
-            firstAction && this.switchTo(firstAction, true);
+            requestAnimationFrame(() => {
+                var firstAction = this.batch.scripts.names[0];
+                firstAction && this.switchTo(firstAction);
+            });
         });
         this.batch.on('script:done', ({scriptName: action, status}) => {
             this.view.status.set(action, status === 'ok' ? '✓' : '✗');
@@ -59,6 +60,25 @@ class DashboardApp {
         tab.controller = shell;
         shell.pipe(<any>tab.terminal as WritableStreamDefaultWriter);
         return tab;
+    }
+
+    reset() {
+        for (let tab of this.tabs.values()) {
+            tab.terminal.clear();
+            tab.controller = undefined;
+        }
+    }
+
+    async onToolbarAction(type: string) {
+        switch (type) {
+            case 'start':
+                this.startLocal(this.view.selected);
+                break;
+            case 'wipe':
+                await this.batch.buildDir.clean();
+                this.reset();
+                break;
+        }
     }
 
     _createTabFor(action: string) {
@@ -120,7 +140,7 @@ async function remoteShell(terminal: Terminal, app: App) {
 */
 
 async function nativeShell(app: DashboardApp) {
-    app.batch.loadScripts(new Scripts('data/just.json'));
+    app.batch.loadScripts(new Scripts('data/urchin.json'));
 }
 
 
