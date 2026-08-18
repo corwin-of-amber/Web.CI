@@ -2,11 +2,13 @@ import fs from 'fs';
 import path from 'path';
 import assert from 'assert';
 import EventEmitter from 'events';
-import child_process from 'child_process';
+import child_process, { SpawnOptions } from 'child_process';
 import pty from 'node-pty'; /* @kremlin.native */
 import shellQuote from 'shell-quote';
 import shellParse from 'shell-parse';
 import glob from 'glob';
+
+import { AgentConnection } from './remote/mcp-ssh/client';
 
 
 class Shell extends EventEmitter {
@@ -15,6 +17,9 @@ class Shell extends EventEmitter {
     vars: Env = {}
     varsPrec: VariablePrecedence = {}
     term: {}
+    remote?: AgentConnection
+
+    jobs: (pty.IPty | child_process.ChildProcess)[] = []
 
     constructor() {
         super();
@@ -32,6 +37,12 @@ class Shell extends EventEmitter {
             return this._run(cmd);
         else
             return this._run(cmd._, cmd);
+    }
+
+    async stop() {
+        for (let job of this.jobs) {
+            job.kill('SIGINT');
+        }
     }
 
     async _run(cmd: CommandInput, opts: CommandOptions = {}) {
@@ -223,17 +234,38 @@ class Shell extends EventEmitter {
 
     spawn(file: string, args: string[] = [], env: Env = {},
           stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
-        return stdin ? this.spawnChild(file, args, env, stdin, options)
-                     : this.spawnPty(file, args, env, stdin, options);
+
+        return this.remote ? this.spawnRemote(file, args, env, stdin, options)
+            : stdin ? this.spawnChild(file, args, env, stdin, options)
+                    : this.spawnPty(file, args, env, stdin, options);
+    }
+
+    spawnRemote(file: string, args: string[] = [], env: Env = {},
+                stdin: string = undefined, options: SpawnOptions = {}): Promise<CommandExit> {
+        let task = this.remote.spawn(file, args, {
+            cwd: this.cwd,
+            env,  /* agent is expected to append this to its base env */
+            stdin,
+            ...options
+        });
+
+        for (let s of [task.stdout, task.stderr])
+            s.on('data', d => this.emit('data', d));
+
+        task.finished.then(console.log)
+        task.finished.catch(console.error);
+
+        return task.finished;
     }
 
     spawnPty(file: string, args: string[] = [], env: Env = {},
-             stdin: string = undefined, options: {} = {}): Promise<CommandExit> {
+             stdin: string = undefined, options: SpawnOptions = {}): Promise<CommandExit> {
         var p = pty.spawn(file, args, {
             cwd: this.cwd,
             env: {...this.env, ...env},
             ...this.term, ...options
         });
+        this.jobs.push(p);
 
         p.onData(d => this.emit('data', d));
         if (typeof stdin === 'string') { p.write(stdin); p.write('\n\x04'/*EOF*/); }
@@ -249,6 +281,7 @@ class Shell extends EventEmitter {
             stdio: ['pipe', 'pipe', 'pipe'],
             ...options
         });
+        this.jobs.push(c);
 
         for (let s of [c.stdout, c.stderr])
             s.on('data', d => this.emit('data', d));

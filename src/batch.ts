@@ -2,6 +2,7 @@ import fs from 'fs';
 import assert from 'assert';
 import { EventEmitter } from 'events';
 import { Shell, Env, CommandExit } from './shell';
+import { AgentConnection } from './remote/mcp-ssh/client';
 
 
 class Batch extends EventEmitter {
@@ -27,10 +28,12 @@ class Batch extends EventEmitter {
         this.emit('scripts:loaded', {arg});
     }
 
-    startLocalJob(scriptName: string) {
+    startJob(scriptName: string, remote?: AgentConnection) {
         var shell = this.createLocalShell(),
             script = this.scripts?.get(scriptName),
             startTime = Date.now();
+
+        shell.remote = remote;
 
         this.emit('script:start', {scriptName, startTime});
 
@@ -61,7 +64,7 @@ class Batch extends EventEmitter {
         if (state) this.lastState = state;
         
         for (let action of actions) {
-            var {shell, job} = this.startLocalJob(action);
+            var {shell, job} = this.startJob(action);
             out ? shell.forward(out)
                 : shell.pipe(<any>process.stdout);
             var {status} = await job;

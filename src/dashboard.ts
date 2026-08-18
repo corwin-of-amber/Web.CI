@@ -8,6 +8,7 @@ import './tty.css';
 import appComponent, { IApp } from './components/app.vue';
 import { Shell } from './shell';
 import { Batch, Scripts } from './batch';
+import { AgentConnection } from './remote/mcp-ssh/client';
 
 import { ViviMap } from './infra/collections';
 
@@ -35,11 +36,22 @@ class DashboardApp {
         });
         this.batch.on('script:done', ({scriptName: action, status}) => {
             this.view.status.set(action, status === 'ok' ? '✓' : '✗');
-        })
+        });
+        // Cleanup
+        window.addEventListener('beforeunload', () => this.stopAll());
     }
 
-    startLocal(action: string) {
-        var { shell } = this.batch.startLocalJob(action),
+    async startLocal(action: string) {
+        await this.stop(action);  // in case any previous job is still attached
+
+        let ac = new AgentConnection('shachari@lamport', {
+            sshFlags: ['-o', 'ProxyCommand=nc -X 5 -x 127.0.0.1:1080 %h %p']
+        });
+        await ac.ready;
+
+        console.log(await ac.env());
+
+        let { shell } = this.batch.startJob(action, ac),
             tab = this.attach(action, shell);
         return tab;
     }
@@ -60,6 +72,18 @@ class DashboardApp {
         tab.controller = shell;
         shell.pipe(<any>tab.terminal as WritableStreamDefaultWriter);
         return tab;
+    }
+
+    async stop(action: string) {
+        var tab = this.tabs.get(action);
+        await tab.controller?.stop();
+        tab.controller = undefined;        
+    }
+
+    stopAll() {
+        for (let tab of this.tabs.values()) {
+            tab.controller?.stop();
+        }
     }
 
     reset() {
@@ -91,6 +115,7 @@ class DashboardApp {
             cols: 80,
             rendererType: 'dom',
             allowTransparency: true,
+            convertEol: true,
             theme: {
                 background: 'transparent'
             }
@@ -112,7 +137,7 @@ function main() {
     //remoteShell(terminal, app);
     nativeShell(app);
 
-    Object.assign(window, {app});
+    Object.assign(window, { app });
 }
 /*
 async function remoteShell(terminal: Terminal, app: App) {
