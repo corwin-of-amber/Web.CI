@@ -1,8 +1,8 @@
 import { EventEmitter } from 'events';
 import type { SpawnOptions } from 'child_process';
 import { Client } from '@modelcontextprotocol/sdk/client'; /** @kremlin.native */
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio'; /** @kremlin.native */
-import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types'; /** @kremlin.native */
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'; /** @kremlin.native */
+import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js'; /** @kremlin.native */
 
 
 class AgentConnection {
