@@ -1,15 +1,73 @@
 {
     "scripts": {
-        "download": [
-            "git clone https://github.com/corwin-of-amber/wasi-kernel.git ."
+        "(probe)": [
+            "env"
         ],
-        "build:phase-1": [
-            "SKIP_BIN=1 npm i",
-            "cd phase-1",
-            "npm run build"
-        ],
-        "build": [
-            "npm run build"
-        ]
+        "wasik": {
+            "install": {
+                "rustup": [
+                    "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+                ],
+                "wasm-pack": [
+                    "cargo install wasm-pack"
+                ],
+                "wasm-opt": [
+                    "npm i -g binaryen"
+                ]
+            },
+            "download": [
+                "git clone --depth 1 https://github.com/corwin-of-amber/wasi-kernel.git .",
+                "git submodule update --init --depth 1"
+            ],
+            "build": {
+                "wasmer-js": [
+                    "cd packages/wasmer-js",
+                    "npm i",
+                    "npm run build"
+                ],
+                "wasi-kernel": [
+                    "npm i",
+                    "npm run build"
+                ]
+            }
+        },
+        "lean": {
+            "get": [
+                "LEAN_REPO=https://github.com/corwin-of-amber/lean4.git",
+                "LEAN_BRANCH=crazy-4.34.0",
+                "git clone --depth 1 $LEAN_REPO -b $LEAN_BRANCH lean4"
+            ],
+            "build": {
+                "native": [
+                    "J=80",
+                    "cd lean4",
+                    "cmake --preset release",
+                    "make -C build/release -j$J"
+                ],
+                "wasm": [
+                    "cd lean4",
+                    "WASI_SDK=/opt/wasi-sdk-33",
+                    "WASIX_LIBC=/opt/wasix-libc-2026/exnref-ehpic",
+                    "cd crazy", "npm i", "cd ..",
+                    "wasi-kit make -f crazy.makefile DLSYM=dyn -j$J"
+                ],
+                "wasm-lib": [
+                    "cd lean4",
+                    "make -f crazy.makefile lib-init-wasm",
+                    "make -f crazy.makefile lib-std-wasm",
+                    "make -f crazy.makefile lib-lean-wasm",
+                    "make -f crazy.makefile lib-lake-wasm",
+                    "make -f crazy.makefile lib-wasm-tars",
+                    "make -f crazy.makefile lib-wasm-install"
+                ]
+            },
+            "test": {
+                "scribble": [
+                    "cd lean4",
+                    "cd crazy", "npm i", "cd ..",
+                    "npx tsx crazy/builder.ts $HOME/var/tmp/scribble Game"
+                ]
+            }
+        }
     }
 }
