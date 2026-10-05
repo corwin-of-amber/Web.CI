@@ -3,12 +3,14 @@ import type { SpawnOptions } from 'child_process';
 import { Client } from '@modelcontextprotocol/sdk/client'; /** @kremlin.native */
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'; /** @kremlin.native */
 import { LoggingMessageNotificationSchema } from '@modelcontextprotocol/sdk/types.js'; /** @kremlin.native */
+import { Env } from '../../shell';
 
 
 class AgentConnection {
     client: Client
     transport: StdioClientTransport
     ready: Promise<void>
+    env: Env = {}
 
     tasks = new Map<number, Task>()
 
@@ -45,6 +47,10 @@ class AgentConnection {
         await this.client.connect(this.transport);
     }
 
+    async close() {
+        await this.transport.close();
+    }
+
     /**
      * Resolves only when the process finishes. During execution,
      * log events are sent.
@@ -62,8 +68,9 @@ class AgentConnection {
     
     _jid = 0
 
-    async env() {
-        return (await this.client.callTool({name: "env"})).result;
+    async getEnv() {
+        return this.env =
+            (await this.client.callTool({name: "env"})).result as Env;
     }
 }
 

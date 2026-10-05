@@ -41,7 +41,7 @@ class Shell extends EventEmitter {
 
     async stop() {
         for (let job of this.jobs) {
-            job.kill('SIGINT');
+            job.kill('SIGTERM');
         }
     }
 
@@ -244,7 +244,7 @@ class Shell extends EventEmitter {
                 stdin: string = undefined, options: SpawnOptions = {}): Promise<CommandExit> {
         let task = this.remote.spawn(file, args, {
             cwd: this.cwd,
-            env,  /* agent is expected to append this to its base env */
+            env: {...this.env, ...env},  /* agent is expected to append this to its base env */
             stdin,
             ...options
         });
