@@ -28,12 +28,15 @@ class Batch extends EventEmitter {
         this.emit('scripts:loaded', {arg});
     }
 
-    startJob(scriptName: string, remote?: AgentConnection) {
+    startJob(scriptName: ActionSpecifier, remote?: AgentConnection) {
         var shell = this.createLocalShell(),
             script = this.scripts?.get(scriptName),
             startTime = Date.now();
 
+        assert(Array.isArray(script));
+
         shell.remote = remote;
+        if (remote) shell.env = {...remote.env};
 
         this.emit('script:start', {scriptName, startTime});
 
@@ -131,6 +134,8 @@ namespace Batch {
     }
 }
 
+type ActionSpecifier = string | string[]
+
 
 class Scripts {
     defs: {
@@ -147,20 +152,37 @@ class Scripts {
     }
 
     get names() {
-        return Object.keys(this.defs.scripts);
+        function *aux(o: Scripts.Bundle) {
+            for (let [k, v] of Object.entries(o)) {
+                if (Array.isArray(v)) yield [k];
+                else for (let kn of aux(v)) yield [k, ...kn];
+            }
+        }
+        return [...aux(this.defs.scripts)];
     }
 
-    get(name: string) {
+    get(name: ActionSpecifier) {
         var searchIn = Scripts.SECTIONS;
-        return searchIn.map(k => this.defs[k]?.[name])
+        return searchIn.map(k => this.nested(this.defs[k], name))
                        .find(x => x) ?? [name];
+    }
+
+    nested(bundle: Scripts.Bundle, qualifiedName: ActionSpecifier) {
+        let o: Scripts.Bundle[string] = bundle;
+        for (let k of Array.isArray(qualifiedName) ? qualifiedName : [qualifiedName]) {
+            if (o && !Array.isArray(o))
+                o = o[k];
+            else
+                return undefined;
+        }
+        return o;
     }
 }
 
 namespace Scripts {
     export type Sections = 'scripts' | 'optional-scripts' | 'recipes';
     export const SECTIONS = ['scripts', 'optional-scripts', 'recipes'];
-    export type Bundle = {[name: string]: string[]};
+    export type Bundle = {[name: string]: string[] | Bundle};
 }
 
 
@@ -186,4 +208,4 @@ namespace BuildDirectory {
 }
 
 
-export { Batch, Scripts, BuildDirectory }
+export { Batch, ActionSpecifier, Scripts, BuildDirectory }

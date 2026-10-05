@@ -4,10 +4,9 @@ import 'xterm/css/xterm.css';
 
 import './tty.css';
 
-// @ts-ignore
 import appComponent, { IApp } from './components/app.vue';
 import { Shell } from './shell';
-import { Batch, Scripts } from './batch';
+import { Batch, Scripts, ActionSpecifier } from './batch';
 import { AgentConnection } from './remote/mcp-ssh/client';
 
 import { ViviMap } from './infra/collections';
@@ -18,6 +17,7 @@ class DashboardApp {
     tabs = new ViviMap<string, Tab>().withFactory(k => this._createTabFor(k))
 
     batch = new Batch
+    agent?: AgentConnection
 
     constructor(containerId = '#app-container') {
         this.view = Vue.createApp(appComponent, {
@@ -41,23 +41,31 @@ class DashboardApp {
         window.addEventListener('beforeunload', () => this.stopAll());
     }
 
-    async startLocal(action: string) {
-        await this.stop(action);  // in case any previous job is still attached
-
-        let ac = new AgentConnection('shachari@lamport', {
-            sshFlags: ['-o', 'ProxyCommand=nc -X 5 -x 127.0.0.1:1080 %h %p']
+    async connect(host: string, proxy: string = '127.0.0.1:1080') {
+        let ac = new AgentConnection(host, {
+            sshFlags: ['-o', `ProxyCommand=nc -X 5 -x ${proxy} %h %p`]
         });
         await ac.ready;
 
-        console.log(await ac.env());
+        console.log(await ac.getEnv());
+        this.agent = ac;
+    }
 
-        let { shell } = this.batch.startJob(action, ac),
+    disconnect() {
+        this.agent.close();
+    }
+
+    async startLocal(action: string) {
+        await this.stop(action);  // in case any previous job is still attached
+
+        let { shell } = this.batch.startJob(action, this.agent),
             tab = this.attach(action, shell);
         return tab;
     }
 
     switchTo(action: string, autostart = false) {
-        var tab = this.tabs.get(action);
+        console.log('switchTo', action)
+        var tab = this.tabs.get(this._actionKey(action));
         this.view.selectAction(action);
         if (autostart) {
             if (!tab.controller) this.startLocal(action);
@@ -66,7 +74,7 @@ class DashboardApp {
     }
 
     attach(action: string, shell: Shell) {
-        var tab = this.tabs.get(action);
+        var tab = this.tabs.get(this._actionKey(action));
         if (tab.controller)
             throw new Error(`'${action}' already has a running shell`);
         tab.controller = shell;
@@ -75,7 +83,7 @@ class DashboardApp {
     }
 
     async stop(action: string) {
-        var tab = this.tabs.get(action);
+        var tab = this.tabs.get(this._actionKey(action));
         await tab.controller?.stop();
         tab.controller = undefined;        
     }
@@ -98,16 +106,29 @@ class DashboardApp {
             case 'start':
                 this.startLocal(this.view.selected);
                 break;
+            case 'stop':
+                this.stop(this.view.selected);
+                break;
             case 'wipe':
                 await this.batch.buildDir.clean();
                 this.reset();
                 break;
+            case 'connect':
+                await this.connect('shachari@lamport');
+                break;
+            case 'disconnect':
+                this.disconnect();
+                break;
         }
     }
 
-    _createTabFor(action: string) {
+    _actionKey(action: ActionSpecifier) {
+        return this.view.actionKey(action);
+    }
+
+    _createTabFor(actionKey: string) {
         var t = this._createTab();
-        t.terminal.open(this.view.getTerminal(action));
+        t.terminal.open(this.view.getTerminal(actionKey));
         return t;
     }
     _createTab(): Tab {
